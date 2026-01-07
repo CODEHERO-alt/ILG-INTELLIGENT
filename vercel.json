@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/jobs/discover-instagram",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/jobs/enrich-websites",
+      "schedule": "0 */3 * * *"
+    }
+  ]
+  }
