@@ -19,18 +19,16 @@ export async function POST(req: NextRequest) {
 
     const batchSize = clampInt(process.env.ENRICH_BATCH_SIZE, 25, 1, 100);
 
-    // Optional: only re-enrich after N days unless force=true
     const staleDays = clampInt(process.env.ENRICH_STALE_DAYS, 7, 1, 60);
     const staleBefore = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000).toISOString();
 
     let query = supabase
       .from("instagram_accounts")
       .select("*")
-      .limit(batchSize);
+      .limit(batchSize)
+      .order("enriched_at", { ascending: true, nullsFirst: true });
 
     if (!force) {
-      // Prefer never enriched OR stale enriched
-      // We'll fetch ones that are null first by ordering; keep it simple and predictable:
       query = query.or(`enriched_at.is.null,enriched_at.lt.${staleBefore}`);
     }
 
@@ -49,49 +47,69 @@ export async function POST(req: NextRequest) {
 
       try {
         const website = typeof lead.website === "string" ? lead.website.trim() : "";
-        if (!website) continue;
+        if (!website) {
+          const score = scoreLead({
+            followers: lead.followers ?? 0,
+            has_website: false,
+          });
 
-        const enrichment = await enrichWebsite(website);
-        if (!enrichment) continue;
+          await supabase
+            .from("instagram_accounts")
+            .update({
+              quality_score: score,
+              enriched_at: new Date().toISOString(),
+            })
+            .eq("id", lead.id);
 
+          continue;
+        }
+
+        const info = await enrichWebsite(website);
+
+        const hasWebsite = !!website;
         const score = scoreLead({
-          followers: Number(lead.followers ?? 0),
-          has_booking: Boolean(enrichment.has_booking),
-          has_checkout: Boolean(enrichment.has_checkout),
-          offer_keywords: Array.isArray(enrichment.offer_keywords) ? enrichment.offer_keywords : [],
+          followers: lead.followers ?? 0,
+          has_website: hasWebsite,
+          has_booking: info?.has_booking ?? false,
+          has_checkout: info?.has_checkout ?? false,
+          offer_keywords: info?.offer_keywords ?? [],
+          has_email: !!info?.contact_email,
+          has_phone: !!info?.contact_phone,
+          has_whatsapp: !!info?.contact_whatsapp,
         });
 
-        const { error: updErr } = await supabase
+        await supabase
           .from("instagram_accounts")
           .update({
-            ...enrichment,
+            website_title: info?.website_title ?? lead.website_title ?? null,
+            website_platform: info?.website_platform ?? lead.website_platform ?? null,
+            has_booking: info?.has_booking ?? lead.has_booking ?? false,
+            has_checkout: info?.has_checkout ?? lead.has_checkout ?? false,
+            offer_keywords: info?.offer_keywords ?? lead.offer_keywords ?? null,
+
+            contact_email: info?.contact_email ?? lead.contact_email ?? null,
+            contact_phone: info?.contact_phone ?? lead.contact_phone ?? null,
+            contact_whatsapp: info?.contact_whatsapp ?? lead.contact_whatsapp ?? null,
+
             quality_score: score,
             enriched_at: new Date().toISOString(),
           })
           .eq("id", lead.id);
-
-        if (updErr) {
-          failures.push({ id: lead.id, username: lead.username, reason: updErr.message });
-          continue;
-        }
 
         enriched++;
       } catch (e: any) {
         failures.push({
           id: lead.id,
           username: lead.username,
-          reason: e?.message ?? "unknown_error",
+          reason: e?.message || "ENRICH_FAILED",
         });
       }
     }
 
     return NextResponse.json({
       ok: true,
-      batchSize,
-      force,
       processed,
       enriched,
-      failuresCount: failures.length,
       failures,
     });
   } catch (e: any) {
