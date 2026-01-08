@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
 function hasSupabaseSession(req: NextRequest) {
-  // Supabase SSR commonly uses a cookie like: sb-<project-ref>-auth-token
-  // Some setups may also include legacy sb-access-token / sb-refresh-token.
   const cookies = req.cookies.getAll();
 
   for (const c of cookies) {
     const name = c.name;
 
+    // legacy tokens
     if (name === "sb-access-token" || name === "sb-refresh-token") return true;
 
-    // sb-<ref>-auth-token typically holds JSON with access_token/refresh_token
+    // modern cookie format from Supabase SSR
     if (/^sb-.*-auth-token$/.test(name)) {
-      const v = c.value || "";
-      // Quick sanity check: should look like JSON and contain "access_token"
-      if (v.includes("access_token")) return true;
+      return Boolean(c.value && c.value.length > 10);
     }
   }
   return false;
