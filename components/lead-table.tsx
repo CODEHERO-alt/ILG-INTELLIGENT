@@ -14,7 +14,7 @@ const STATUSES = [
 ];
 
 function prettyStatus(s: string) {
-  return s.replaceAll("_", " ");
+  return s.replace(/_/g, " ");
 }
 
 function scoreBadge(score: number) {
@@ -110,7 +110,6 @@ export default function LeadTable({ leads }: { leads: any[] }) {
         return;
       }
 
-      // Keep it simple + reliable: refresh server data
       window.location.reload();
     } finally {
       setSavingId(null);
@@ -173,42 +172,36 @@ export default function LeadTable({ leads }: { leads: any[] }) {
                 return (
                   <tr key={l.id} className="hover:bg-white/[0.03] transition">
                     <td className="border-t border-white/10 px-4 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-semibold text-white">
-                            {l.username ?? "Unknown"}
-                          </div>
-
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/50">
-                            {l.inferred_niche ? (
-                              <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5">
-                                {l.inferred_niche}
-                              </span>
-                            ) : null}
-
-                            {l.website_platform ? (
-                              <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5">
-                                {l.website_platform}
-                              </span>
-                            ) : null}
-                          </div>
-
-                          {l.website ? (
-                            <a
-                              className="mt-2 inline-block text-xs text-cyan-200/90 hover:text-cyan-200 underline underline-offset-2"
-                              href={l.website}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {l.website}
-                            </a>
-                          ) : (
-                            <div className="mt-2 text-xs text-white/35">
-                              No website
-                            </div>
-                          )}
-                        </div>
+                      <div className="font-semibold text-white">
+                        {l.username ?? "Unknown"}
                       </div>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/50">
+                        {l.inferred_niche ? (
+                          <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5">
+                            {l.inferred_niche}
+                          </span>
+                        ) : null}
+
+                        {l.website_platform ? (
+                          <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5">
+                            {l.website_platform}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {l.website ? (
+                        <a
+                          className="mt-2 inline-block text-xs text-cyan-200/90 hover:text-cyan-200 underline underline-offset-2"
+                          href={l.website}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {l.website}
+                        </a>
+                      ) : (
+                        <div className="mt-2 text-xs text-white/35">No website</div>
+                      )}
                     </td>
 
                     <td className="border-t border-white/10 px-4 py-3">
