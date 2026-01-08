@@ -22,7 +22,7 @@ const STATUSES = [
 
 function prettyStatus(s: string) {
   if (s === "all") return "All";
-  return s.replaceAll("_", " ");
+  return s.replace(/_/g, " ");
 }
 
 export default function LeadFilters({
