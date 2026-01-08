@@ -11,7 +11,7 @@ import {
 import { enrichWebsite } from "@/lib/enrichment";
 import { scoreLead } from "@/lib/scoring";
 
-function isCronAuthed(req: NextRequest) {
+function isCron(req: NextRequest) {
   try {
     assertCronAuth(req);
     return true;
@@ -27,37 +27,39 @@ function parseList(v: string | null) {
     .filter(Boolean);
 }
 
-async function runDiscovery(raw: unknown, req: NextRequest) {
-  const cronOk = isCronAuthed(req);
-  if (!cronOk) {
+async function run(req: NextRequest, raw: any) {
+  // ✅ Allow either cron OR logged-in admin
+  if (!isCron(req)) {
     await requireAdminUser();
   }
 
   const params = DiscoverParamsSchema.parse(raw ?? {});
   const supabase = getAdminSupabaseClient();
 
-  // 1) discover candidate IG accounts using Serper/SerpApi via lib/instagramClient.ts
+  // discover candidates from web search
   const accounts = await discoverInstagramAccounts(params);
 
-  // 2) upsert to DB (dedupe by username)
-  for (const acc of accounts) {
-    await supabase.from("instagram_accounts").upsert(acc, {
+  // upsert by username (dedupe)
+  if (accounts.length) {
+    const { error } = await supabase.from("instagram_accounts").upsert(accounts, {
       onConflict: "username",
     });
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    }
   }
 
-  // 3) fetch the inserted/updated rows back so we can enrich/score
+  // fetch rows back for enrichment/scoring
   const usernames = accounts.map((a) => a.username);
-  const { data: rows, error } = await supabase
+  const { data: rows, error: fetchErr } = await supabase
     .from("instagram_accounts")
     .select("*")
-    .in("username", usernames);
+    .in("username", usernames.length ? usernames : ["__none__"]);
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+  if (fetchErr) {
+    return NextResponse.json({ ok: false, error: fetchErr.message }, { status: 400 });
   }
 
-  // 4) enrich + score (same logic you already had)
   let enrichedNow = 0;
 
   for (const lead of rows ?? []) {
@@ -81,6 +83,7 @@ async function runDiscovery(raw: unknown, req: NextRequest) {
     }
 
     const info = await enrichWebsite(website);
+
     const score = scoreLead({
       followers: lead.followers ?? 0,
       has_website: true,
@@ -100,11 +103,9 @@ async function runDiscovery(raw: unknown, req: NextRequest) {
         has_booking: info?.has_booking ?? lead.has_booking ?? false,
         has_checkout: info?.has_checkout ?? lead.has_checkout ?? false,
         offer_keywords: info?.offer_keywords ?? lead.offer_keywords ?? null,
-
         contact_email: info?.contact_email ?? lead.contact_email ?? null,
         contact_phone: info?.contact_phone ?? lead.contact_phone ?? null,
         contact_whatsapp: info?.contact_whatsapp ?? lead.contact_whatsapp ?? null,
-
         quality_score: score,
         enriched_at: new Date().toISOString(),
       })
@@ -113,23 +114,24 @@ async function runDiscovery(raw: unknown, req: NextRequest) {
     enrichedNow++;
   }
 
-  return NextResponse.json({ ok: true, inserted: accounts.length, enrichedNow });
+  return NextResponse.json({
+    ok: true,
+    queries: params.niches.length * Math.max(1, params.locations.length) * Math.max(1, params.intent.length),
+    discovered: accounts.length,
+    insertedOrUpdated: accounts.length,
+    enrichedNow,
+  });
 }
 
-// ✅ Manual/UI uses POST with JSON body (unchanged)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    return await runDiscovery(body, req);
+    return await run(req, body);
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 401 });
+    return NextResponse.json({ ok: false, error: e?.message ?? "error" }, { status: 400 });
   }
 }
 
-// ✅ Cron uses GET (Vercel cron hits via GET)
-// You can also run it manually as GET if you want:
-//
-// /api/jobs/discover-instagram?niches=dentist,gym&locations=pakistan&limit=100&perQuery=20
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
@@ -143,11 +145,9 @@ export async function GET(req: NextRequest) {
       perQuery: Number(url.searchParams.get("perQuery") ?? "20"),
     };
 
-    // If someone calls GET with no params, fall back to safe defaults:
-    if (!raw.niches.length) raw.niches = ["dentist", "gym", "real estate"];
-
-    return await runDiscovery(raw, req);
+    if (!raw.niches.length) raw.niches = ["dentist"]; // safe default
+    return await run(req, raw);
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 401 });
+    return NextResponse.json({ ok: false, error: e?.message ?? "error" }, { status: 400 });
   }
 }
