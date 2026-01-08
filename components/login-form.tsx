@@ -1,18 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-function getSupabaseClient(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return null;
-  return createClient(url, anon);
-}
+import { supabaseClient } from "@/lib/supabase-client";
 
 export default function LoginForm() {
-  const supabase = useMemo(() => getSupabaseClient(), []);
-
+  const supabase = useMemo(() => supabaseClient, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -21,15 +13,8 @@ export default function LoginForm() {
 
   async function login() {
     setErrorMsg(null);
-
-    if (!supabase) {
-      setErrorMsg(
-        "Supabase env vars are missing. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel Environment Variables."
-      );
-      return;
-    }
-
     setLoading(true);
+
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -41,7 +26,10 @@ export default function LoginForm() {
         return;
       }
 
-      window.location.href = "/dashboard";
+      // ✅ redirect to ?next=/dashboard if provided
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next") || "/dashboard";
+      window.location.href = next;
     } catch (e: any) {
       setErrorMsg(e?.message ?? "Login failed. Please try again.");
     } finally {
@@ -63,7 +51,6 @@ export default function LoginForm() {
 
       {/* Content */}
       <div className="relative w-full max-w-[420px]">
-        {/* Header */}
         <div className="mb-6 text-center">
           <div className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 backdrop-blur">
             ILG • Admin Access
@@ -77,12 +64,9 @@ export default function LoginForm() {
           </p>
         </div>
 
-        {/* Card */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.55)]">
           <div className="p-5 sm:p-6">
-            <label className="block text-xs font-medium text-white/70">
-              Email
-            </label>
+            <label className="block text-xs font-medium text-white/70">Email</label>
             <input
               className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
               placeholder="name@company.com"
