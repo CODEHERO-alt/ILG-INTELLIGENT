@@ -3,12 +3,18 @@ import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 
+type CookieToSet = {
+  name: string;
+  value: string;
+  options?: CookieOptions;
+};
+
 /**
- * Creates a Supabase client for Server Components / Route Handlers
- * using the Next.js cookies() store.
+ * Supabase server client for Server Components / Route Handlers.
+ * Uses Next's cookies() store.
  *
- * IMPORTANT:
- * @supabase/ssr now expects getAll/setAll cookie methods.
+ * NOTE:
+ * @supabase/ssr expects getAll/setAll cookie methods.
  */
 export function getSupabaseServerClient() {
   const cookieStore = cookies();
@@ -21,14 +27,14 @@ export function getSupabaseServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: CookieToSet[]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options as CookieOptions);
+              cookieStore.set(name, value, options);
             });
           } catch {
-            // In Server Components, cookies() can be read-only in some contexts.
-            // That's OK: auth still works for reads; writes happen in middleware/route handlers.
+            // In some Server Component contexts, cookies() can be read-only.
+            // Reads still work; cookie writes should happen in middleware/route handlers.
           }
         },
       },
@@ -49,7 +55,7 @@ export function getAdminSupabaseClient() {
         getAll() {
           return [];
         },
-        setAll() {
+        setAll(_cookiesToSet: CookieToSet[]) {
           // no-op
         },
       },
