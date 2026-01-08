@@ -38,14 +38,16 @@ function buildQueries(params: DiscoverParams) {
         const parts = [niche, loc, i].filter(Boolean);
         if (!parts.length) continue;
 
+        // ✅ Focus on profile pages (site:instagram.com) while excluding posts/reels/tags/etc via -inurl
         let q = `site:instagram.com ${parts.map((p) => `"${p}"`).join(" ")}`;
 
         const excludes = [
-          "site:instagram.com/p",
-          "site:instagram.com/reel",
-          "site:instagram.com/tv",
-          "site:instagram.com/explore",
-          "site:instagram.com/tags",
+          "-inurl:/p/",
+          "-inurl:/reel/",
+          "-inurl:/tv/",
+          "-inurl:/explore/",
+          "-inurl:/tags/",
+          "-inurl:/stories/",
           ...exclude.map((e) => `-"${e}"`),
         ];
 
@@ -77,7 +79,7 @@ function extractInstagramUsername(url: string): string | null {
     if (parts.length === 0) return null;
 
     const first = parts[0];
-    if (!first) return null; // ✅ TS guard
+    if (!first) return null;
 
     const blocked = new Set<string>([
       "p",
@@ -116,13 +118,17 @@ function extractPossibleWebsiteFromText(text: string) {
     if (!/instagram\.com/i.test(candidate)) return candidate;
   }
 
-  const wwwMatch = t.match(/\bwww\.[\w\-]+\.[\w\-.]{2,}(?:\/[\w\-._~:/?#[\]@!$&'()*+,;=%]+)?/i);
+  const wwwMatch = t.match(
+    /\bwww\.[\w\-]+\.[\w\-.]{2,}(?:\/[\w\-._~:/?#[\]@!$&'()*+,;=%]+)?/i
+  );
   if (wwwMatch?.[0]) {
     const candidate = `https://${wwwMatch[0]}`;
     if (!/instagram\.com/i.test(candidate)) return candidate;
   }
 
-  const linkTreeMatch = t.match(/\b(linktr\.ee|beacons\.ai|lnk\.bio|bio\.site|taplink\.cc)\/[\w\-._~:/?#[\]@!$&'()*+,;=%]+/i);
+  const linkTreeMatch = t.match(
+    /\b(linktr\.ee|beacons\.ai|lnk\.bio|bio\.site|taplink\.cc)\/[\w\-._~:/?#[\]@!$&'()*+,;=%]+/i
+  );
   if (linkTreeMatch?.[0]) {
     return `https://${linkTreeMatch[0]}`;
   }
