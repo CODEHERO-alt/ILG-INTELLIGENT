@@ -9,7 +9,11 @@ function clampInt(value: string | null, fallback: number, min: number, max: numb
 
 function escapeLike(input: string) {
   // escape % and _ for LIKE queries
-  return input.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+  // NOTE: avoid String.prototype.replaceAll to keep compatibility with older TS lib targets.
+  return input
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
 }
 
 export async function GET(req: NextRequest) {
