@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 
+type CookieOptions = Record<string, any>;
+
 export function getSupabaseServerClient() {
   const cookieStore = cookies();
 
@@ -10,9 +12,11 @@ export function getSupabaseServerClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name) => cookieStore.get(name)?.value,
-        set: () => {},
-        remove: () => {},
+        get: (name: string) => cookieStore.get(name)?.value,
+        // In Server Components, Next's cookies() is read-only.
+        // We keep set/remove as no-ops but typed to satisfy TS + Supabase SSR interface.
+        set: (_name: string, _value: string, _options?: CookieOptions) => {},
+        remove: (_name: string, _options?: CookieOptions) => {},
       },
     }
   );
@@ -22,7 +26,7 @@ export function getAdminSupabaseClient() {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: {} }
+    { cookies: {} as any }
   );
 }
 
