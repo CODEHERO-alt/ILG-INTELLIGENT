@@ -13,7 +13,6 @@ async function safeLogJobRun(
   supabase: ReturnType<typeof getAdminSupabaseClient>,
   payload: any
 ) {
-  // job_runs table is optional — never crash the job if it doesn't exist
   try {
     const { error } = await supabase.from("job_runs").insert(payload);
     if (error) {
@@ -25,7 +24,6 @@ async function safeLogJobRun(
 }
 
 async function runEnrich(req: NextRequest) {
-  // ✅ Cron endpoints should be protected
   assertCronAuth(req);
 
   const supabase = getAdminSupabaseClient();
@@ -63,7 +61,7 @@ async function runEnrich(req: NextRequest) {
         followers: lead.followers ?? 0,
         has_website: true,
         has_booking: info?.has_booking ?? false,
-        has_checkout: info?.has_has_checkout ?? info?.has_checkout ?? false,
+        has_checkout: info?.has_checkout ?? false, // ✅ fixed
         offer_keywords: info?.offer_keywords ?? [],
         has_email: !!info?.contact_email,
         has_phone: !!info?.contact_phone,
@@ -120,7 +118,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ✅ Vercel cron calls endpoints with GET, so support GET too
 export async function GET(req: NextRequest) {
   try {
     return await runEnrich(req);
