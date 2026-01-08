@@ -1,6 +1,7 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 function getCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined;
@@ -34,10 +35,13 @@ function deleteCookie(name: string, options: { path?: string } = {}) {
   document.cookie = `${name}=; Path=${path}; Max-Age=0; SameSite=Lax; Secure`;
 }
 
-export const supabaseClient = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
+export function getBrowserSupabaseClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anon) return null;
+
+  return createBrowserClient(url, anon, {
     cookies: {
       get: (name: string) => getCookie(name),
       set: (name: string, value: string, options?: any) =>
@@ -45,5 +49,5 @@ export const supabaseClient = createBrowserClient(
       remove: (name: string, options?: any) =>
         deleteCookie(name, { path: options?.path }),
     },
-  }
-);
+  });
+}
