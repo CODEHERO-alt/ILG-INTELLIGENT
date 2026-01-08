@@ -10,16 +10,22 @@ export default function LeadTable({ leads }: { leads: any[] }) {
     search: "",
     status: "all",
     minScore: "7",
+    maxScore: "",
   });
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
     const minScore = Number(filters.minScore || "0");
+    const maxScoreRaw = (filters.maxScore ?? "").trim();
+    const maxScore = maxScoreRaw === "" ? null : Number(maxScoreRaw);
 
     return (leads || [])
       .filter((l) => {
         if (filters.status !== "all" && l.status !== filters.status) return false;
-        if ((l.quality_score ?? 0) < minScore) return false;
+
+        const score = l.quality_score ?? 0;
+        if (score < minScore) return false;
+        if (maxScore !== null && Number.isFinite(maxScore) && score > maxScore) return false;
 
         if (!q) return true;
 
@@ -53,59 +59,75 @@ export default function LeadTable({ leads }: { leads: any[] }) {
 
   return (
     <div>
-      <LeadFilters onChange={setFilters} />
+      <LeadFilters onChange={setFilters} defaultMinScore="7" />
 
-      <table className="w-full border rounded overflow-hidden">
-        <thead className="bg-slate-50">
-          <tr>
-            <th className="border p-2 text-left text-xs">Username</th>
-            <th className="border p-2 text-left text-xs">Score</th>
-            <th className="border p-2 text-left text-xs">Status</th>
-            <th className="border p-2 text-left text-xs">Website</th>
-          </tr>
-        </thead>
+      <div className="overflow-x-auto mt-4 border rounded">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50">
+              <th className="text-left p-3 border-b">Lead</th>
+              <th className="text-left p-3 border-b">Score</th>
+              <th className="text-left p-3 border-b">Status</th>
+              <th className="text-left p-3 border-b">Actions</th>
+            </tr>
+          </thead>
 
-        <tbody>
-          {filtered.map((lead) => (
-            <tr key={lead.id}>
-              <td className="border p-2 text-sm font-medium">{lead.username}</td>
-              <td className="border p-2 text-sm">{lead.quality_score ?? 0}</td>
+          <tbody>
+            {filtered.map((l) => (
+              <tr key={l.id}>
+                <td className="border-t p-3">
+                  <div className="font-medium">{l.username ?? "Unknown"}</div>
+                  {l.website ? (
+                    <a
+                      className="text-xs text-blue-600 underline"
+                      href={l.website}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {l.website}
+                    </a>
+                  ) : (
+                    <div className="text-xs text-slate-400">No website</div>
+                  )}
+                </td>
 
-              <td className="border p-2 text-sm">
-                <select
-                  className="border rounded px-2 py-1 text-sm"
-                  value={lead.status}
-                  onChange={(e) => updateStatus(lead.id, e.target.value)}
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </td>
+                <td className="border-t p-3">{l.quality_score ?? 0}</td>
 
-              <td className="border p-2 text-sm">
-                {lead.website ? (
-                  <a className="underline" href={lead.website} target="_blank" rel="noreferrer">
+                <td className="border-t p-3">
+                  <select
+                    className="border rounded p-1"
+                    value={l.status ?? "new"}
+                    onChange={(e) => updateStatus(l.id, e.target.value)}
+                  >
+                    {STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+
+                <td className="border-t p-3">
+                  <a
+                    className="text-blue-600 underline"
+                    href={`/leads/${l.id}`}
+                  >
                     Open
                   </a>
-                ) : (
-                  <span className="text-slate-400">—</span>
-                )}
-              </td>
-            </tr>
-          ))}
+                </td>
+              </tr>
+            ))}
 
-          {filtered.length === 0 ? (
-            <tr>
-              <td className="border p-3 text-sm text-slate-500" colSpan={4}>
-                No leads match your filters.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+            {filtered.length === 0 ? (
+              <tr>
+                <td className="border p-3 text-sm text-slate-500" colSpan={4}>
+                  No leads match your filters.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
