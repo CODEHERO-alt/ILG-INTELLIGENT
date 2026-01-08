@@ -1,8 +1,40 @@
 "use client";
 
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
-export const supabaseClient = createClient(
+function getCookie(name: string) {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : undefined;
+}
+
+function setCookie(name: string, value: string, options: { maxAge?: number; path?: string } = {}) {
+  if (typeof document === "undefined") return;
+
+  const path = options.path ?? "/";
+  const maxAge = options.maxAge;
+
+  let cookie = `${name}=${encodeURIComponent(value)}; Path=${path}; SameSite=Lax; Secure`;
+  if (typeof maxAge === "number") cookie += `; Max-Age=${maxAge}`;
+
+  document.cookie = cookie;
+}
+
+function deleteCookie(name: string, options: { path?: string } = {}) {
+  if (typeof document === "undefined") return;
+  const path = options.path ?? "/";
+  document.cookie = `${name}=; Path=${path}; Max-Age=0; SameSite=Lax; Secure`;
+}
+
+export const supabaseClient = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    cookies: {
+      get: (name: string) => getCookie(name),
+      set: (name: string, value: string, options?: any) =>
+        setCookie(name, value, { maxAge: options?.maxAge, path: options?.path }),
+      remove: (name: string, options?: any) => deleteCookie(name, { path: options?.path }),
+    },
+  }
 );
