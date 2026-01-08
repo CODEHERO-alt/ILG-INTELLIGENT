@@ -1,13 +1,25 @@
-// middleware.ts
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export function middleware(_req: NextRequest) {
-  // For now, we don't do auth logic in middleware.
-  // Route-level protection is handled in /dashboard via requireAdminUser.
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  if (pathname.startsWith("/dashboard")) {
+    const hasSession = req.cookies.get("sb-access-token");
+    if (!hasSession) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+  }
+
+  if (pathname.startsWith("/api") && !pathname.startsWith("/api/jobs")) {
+    const hasSession = req.cookies.get("sb-access-token");
+    if (!hasSession) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/dashboard/:path*", "/api/:path*"],
 };
