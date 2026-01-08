@@ -1,20 +1,27 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { supabaseClient } from "@/lib/supabase-client";
+import { getBrowserSupabaseClient } from "@/lib/supabase-client";
 
 export default function LoginForm() {
-  const supabase = useMemo(() => supabaseClient, []);
+  const supabase = useMemo(() => getBrowserSupabaseClient(), []);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function login() {
     setErrorMsg(null);
-    setLoading(true);
 
+    if (!supabase) {
+      setErrorMsg(
+        "Supabase environment variables are missing. Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel."
+      );
+      return;
+    }
+
+    setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -26,7 +33,6 @@ export default function LoginForm() {
         return;
       }
 
-      // ✅ redirect to ?next=/dashboard if provided
       const params = new URLSearchParams(window.location.search);
       const next = params.get("next") || "/dashboard";
       window.location.href = next;
@@ -49,7 +55,7 @@ export default function LoginForm() {
         <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(to_right,rgba(255,255,255,0.5)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:48px_48px]" />
       </div>
 
-      {/* Content */}
+      {/* Card */}
       <div className="relative w-full max-w-[420px]">
         <div className="mb-6 text-center">
           <div className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 backdrop-blur">
@@ -66,7 +72,9 @@ export default function LoginForm() {
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.55)]">
           <div className="p-5 sm:p-6">
-            <label className="block text-xs font-medium text-white/70">Email</label>
+            <label className="block text-xs font-medium text-white/70">
+              Email
+            </label>
             <input
               className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-white/20 focus:ring-2 focus:ring-white/10"
               placeholder="name@company.com"
@@ -88,22 +96,22 @@ export default function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
             />
 
-            {errorMsg ? (
+            {errorMsg && (
               <div className="mt-4 rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
                 {errorMsg}
               </div>
-            ) : null}
+            )}
 
             <button
               onClick={login}
               disabled={loading || !email || !password}
               className="mt-5 w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-white/15 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur"
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? "Signing in…" : "Sign in"}
             </button>
 
             <div className="mt-4 text-center text-xs text-white/45">
-              Protected area • If you don’t have access, contact the admin.
+              Protected area • Contact admin if you don’t have access
             </div>
           </div>
 
