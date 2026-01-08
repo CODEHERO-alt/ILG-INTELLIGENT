@@ -1,31 +1,31 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 export type LeadFiltersState = {
   search: string;
   status: string;
   minScore: string;
+  maxScore: string;
 };
 
 const STATUSES = ["all", "new", "queued", "contacted", "loom_sent", "interested", "closed", "dead"];
 
 export default function LeadFilters({
   onChange,
+  defaultMinScore = "7",
 }: {
   onChange: (filters: LeadFiltersState) => void;
+  defaultMinScore?: string;
 }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
-  const [minScore, setMinScore] = useState("7");
+  const [minScore, setMinScore] = useState(defaultMinScore);
+  const [maxScore, setMaxScore] = useState("");
 
-  const state = useMemo(() => ({ search, status, minScore }), [search, status, minScore]);
-
-  // Push changes upward whenever state changes
-  useMemo(() => {
-    onChange(state);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.search, state.status, state.minScore]);
+  useEffect(() => {
+    onChange({ search, status, minScore, maxScore });
+  }, [search, status, minScore, maxScore, onChange]);
 
   return (
     <div className="flex flex-col md:flex-row gap-3 md:items-end mb-4">
@@ -54,8 +54,8 @@ export default function LeadFilters({
         </select>
       </div>
 
-      <div className="w-full md:w-40">
-        <label className="block text-xs text-slate-500 mb-1">Min score</label>
+      <div className="w-full md:w-32">
+        <label className="block text-xs text-slate-500 mb-1">Min</label>
         <input
           className="w-full border rounded px-3 py-2 text-sm"
           type="number"
@@ -66,14 +66,27 @@ export default function LeadFilters({
         />
       </div>
 
+      <div className="w-full md:w-32">
+        <label className="block text-xs text-slate-500 mb-1">Max</label>
+        <input
+          className="w-full border rounded px-3 py-2 text-sm"
+          type="number"
+          min={0}
+          max={10}
+          value={maxScore}
+          onChange={(e) => setMaxScore(e.target.value)}
+        />
+      </div>
+
       <button
         className="border rounded px-3 py-2 text-sm"
+        type="button"
         onClick={() => {
           setSearch("");
           setStatus("all");
-          setMinScore("7");
+          setMinScore(defaultMinScore);
+          setMaxScore("");
         }}
-        type="button"
       >
         Reset
       </button>
