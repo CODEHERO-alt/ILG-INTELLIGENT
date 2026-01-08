@@ -25,6 +25,7 @@ function scoreBadge(score: number) {
 }
 
 export default function LeadTable({ leads }: { leads: any[] }) {
+  // IMPORTANT: default minScore is empty => show ALL leads by default
   const [filters, setFilters] = useState<LeadFiltersState>({
     search: "",
     status: "all",
@@ -44,13 +45,11 @@ export default function LeadTable({ leads }: { leads: any[] }) {
       .filter((l) => {
         const effectiveStatus = localStatus[l.id] ?? l.status ?? "new";
 
-        if (filters.status !== "all" && effectiveStatus !== filters.status)
-          return false;
+        if (filters.status !== "all" && effectiveStatus !== filters.status) return false;
 
         const score = l.quality_score ?? 0;
         if (score < minScore) return false;
-        if (maxScore !== null && Number.isFinite(maxScore) && score > maxScore)
-          return false;
+        if (maxScore !== null && Number.isFinite(maxScore) && score > maxScore) return false;
 
         if (!q) return true;
 
@@ -72,6 +71,7 @@ export default function LeadTable({ leads }: { leads: any[] }) {
 
         return hay.includes(q);
       })
+      // Always give top spot to highest scoring leads
       .sort((a, b) => (b.quality_score ?? 0) - (a.quality_score ?? 0));
   }, [leads, filters, localStatus]);
 
@@ -81,9 +81,7 @@ export default function LeadTable({ leads }: { leads: any[] }) {
     const avg =
       total === 0
         ? 0
-        : Math.round(
-            ((leads || []).reduce((sum, l) => sum + (l.quality_score ?? 0), 0) / total) * 10
-          ) / 10;
+        : Math.round(((leads || []).reduce((sum, l) => sum + (l.quality_score ?? 0), 0) / total) * 10) / 10;
 
     return { total, strong, avg };
   }, [leads]);
@@ -100,6 +98,7 @@ export default function LeadTable({ leads }: { leads: any[] }) {
       });
 
       if (!res.ok) {
+        // rollback local UI on failure
         setLocalStatus((prev) => {
           const { [id]: _, ...rest } = prev;
           return rest;
@@ -123,7 +122,9 @@ export default function LeadTable({ leads }: { leads: any[] }) {
           </div>
         </div>
 
-        <LeadFilters value={filters} onChange={setFilters} />
+        {/* Your repo's LeadFilters does NOT accept `value` prop.
+            It accepts `onChange` and optional `defaultMinScore`. */}
+        <LeadFilters onChange={(next) => setFilters(next)} defaultMinScore="" />
       </div>
 
       <div className="overflow-x-auto">
@@ -156,9 +157,7 @@ export default function LeadTable({ leads }: { leads: any[] }) {
               return (
                 <tr key={l.id} className="hover:bg-white/[0.03] transition">
                   <td className="border-t border-white/10 px-4 py-3">
-                    <div className="font-semibold text-white">
-                      {l.username ?? "Unknown"}
-                    </div>
+                    <div className="font-semibold text-white">{l.username ?? "Unknown"}</div>
 
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/50">
                       {l.inferred_niche ? (
@@ -212,9 +211,7 @@ export default function LeadTable({ leads }: { leads: any[] }) {
                         ))}
                       </select>
 
-                      {savingId === l.id ? (
-                        <span className="text-xs text-white/45">Saving…</span>
-                      ) : null}
+                      {savingId === l.id ? <span className="text-xs text-white/45">Saving…</span> : null}
                     </div>
                   </td>
 
@@ -228,6 +225,7 @@ export default function LeadTable({ leads }: { leads: any[] }) {
                           {l.contact_email}
                         </a>
                       ) : null}
+
                       {l.contact_phone ? (
                         <a
                           className="text-cyan-200/90 hover:text-cyan-200 underline underline-offset-2"
@@ -236,6 +234,7 @@ export default function LeadTable({ leads }: { leads: any[] }) {
                           {l.contact_phone}
                         </a>
                       ) : null}
+
                       {l.contact_whatsapp ? (
                         <a
                           className="text-cyan-200/90 hover:text-cyan-200 underline underline-offset-2"
@@ -246,6 +245,7 @@ export default function LeadTable({ leads }: { leads: any[] }) {
                           WhatsApp
                         </a>
                       ) : null}
+
                       {!l.contact_email && !l.contact_phone && !l.contact_whatsapp ? (
                         <span className="text-white/45">DM-only</span>
                       ) : null}
@@ -268,10 +268,7 @@ export default function LeadTable({ leads }: { leads: any[] }) {
 
             {filtered.length === 0 ? (
               <tr>
-                <td
-                  colSpan={5}
-                  className="border-t border-white/10 px-4 py-8 text-center text-sm text-white/55"
-                >
+                <td colSpan={5} className="border-t border-white/10 px-4 py-8 text-center text-sm text-white/55">
                   No leads found with current filters.
                 </td>
               </tr>
