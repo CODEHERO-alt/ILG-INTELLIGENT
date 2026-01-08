@@ -1,14 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { useMemo, useState } from "react";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function getSupabaseClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // During build-time prerender, these can be undefined -> return null safely.
+  if (!url || !anon) return null;
+
+  return createClient(url, anon);
+}
 
 export default function LoginForm() {
+  const supabase = useMemo(() => getSupabaseClient(), []);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,8 +23,15 @@ export default function LoginForm() {
 
   async function login() {
     setErrorMsg(null);
-    setLoading(true);
 
+    if (!supabase) {
+      setErrorMsg(
+        "Missing Supabase environment variables. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel Environment Variables."
+      );
+      return;
+    }
+
+    setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
