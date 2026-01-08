@@ -67,18 +67,19 @@ function buildQueries(params: DiscoverParams) {
   return out;
 }
 
-function extractInstagramUsername(url: string) {
+function extractInstagramUsername(url: string): string | null {
   try {
     const u = new URL(url);
     const host = u.hostname.toLowerCase();
     if (!host.endsWith("instagram.com")) return null;
 
     const parts = u.pathname.split("/").filter(Boolean);
-    if (!parts.length) return null;
+    if (parts.length === 0) return null;
 
     const first = parts[0];
+    if (!first) return null; // ✅ TS guard
 
-    const blocked = new Set([
+    const blocked = new Set<string>([
       "p",
       "reel",
       "tv",
