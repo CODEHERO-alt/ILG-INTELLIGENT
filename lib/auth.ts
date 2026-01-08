@@ -2,10 +2,6 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 
-/**
- * Supabase server client (uses anon key + request cookies)
- * Use this for "who is logged in" checks.
- */
 export function getSupabaseServerClient() {
   const cookieStore = cookies();
 
@@ -22,10 +18,6 @@ export function getSupabaseServerClient() {
   );
 }
 
-/**
- * Admin/server client (service role). NEVER use in client components.
- * Use this for DB reads/writes once you've already verified auth/admin.
- */
 export function getAdminSupabaseClient() {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,10 +26,6 @@ export function getAdminSupabaseClient() {
   );
 }
 
-/**
- * Returns the current authenticated user (or null).
- * This is the consistent helper that other files can import safely.
- */
 export async function getAuthUser() {
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
@@ -46,28 +34,33 @@ export async function getAuthUser() {
 }
 
 /**
- * Hard requirement: user must be logged in + must be admin.
- * (Admin is determined by app_metadata.role === "admin")
+ * World-class admin check:
+ * - Must be logged in
+ * - Must exist in admin_users table
+ * This avoids relying on user metadata.
  */
 export async function requireAdminUser() {
   const user = await getAuthUser();
+  if (!user) throw new Error("UNAUTHENTICATED");
 
-  if (!user) {
-    throw new Error("UNAUTHENTICATED");
-  }
+  const adminDb = getAdminSupabaseClient();
+  const { data, error } = await adminDb
+    .from("admin_users")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  const isAdmin = user.app_metadata?.role === "admin";
-  if (!isAdmin) {
-    throw new Error("FORBIDDEN");
-  }
+  if (error) throw new Error("ADMIN_CHECK_FAILED");
+  if (!data) throw new Error("FORBIDDEN");
 
   return user;
 }
 
 /**
- * Cron protection.
- * - If CRON_SECRET is set, require Authorization Bearer <secret> or x-cron-secret header.
- * - If CRON_SECRET is NOT set, allow (useful for local dev), but recommended to set it in production.
+ * Cron protection:
+ * If CRON_SECRET is set, require:
+ * - Authorization: Bearer <secret> OR
+ * - x-cron-secret: <secret>
  */
 export function assertCronAuth(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -78,8 +71,8 @@ export function assertCronAuth(req: NextRequest) {
 
   const token =
     (authHeader?.toLowerCase().startsWith("bearer ")
-      ? authHeader.slice(7)
-      : authHeader) || cronHeader;
+      ? authHeader.slice(7).trim()
+      : authHeader?.trim()) || cronHeader?.trim();
 
   if (!token || token !== secret) {
     throw new Error("INVALID_CRON");
