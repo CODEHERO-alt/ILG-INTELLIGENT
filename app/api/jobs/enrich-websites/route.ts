@@ -9,7 +9,23 @@ function clampInt(value: unknown, fallback: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.floor(n)));
 }
 
+async function safeLogJobRun(
+  supabase: ReturnType<typeof getAdminSupabaseClient>,
+  payload: any
+) {
+  // job_runs table is optional — never crash the job if it doesn't exist
+  try {
+    const { error } = await supabase.from("job_runs").insert(payload);
+    if (error) {
+      // ignore
+    }
+  } catch {
+    // ignore
+  }
+}
+
 async function runEnrich(req: NextRequest) {
+  // ✅ Cron endpoints should be protected
   assertCronAuth(req);
 
   const supabase = getAdminSupabaseClient();
@@ -17,11 +33,13 @@ async function runEnrich(req: NextRequest) {
   const batchSize = clampInt(process.env.ENRICH_BATCH_SIZE, 50, 1, 200);
   const staleDays = clampInt(process.env.ENRICH_STALE_DAYS, 7, 1, 365);
 
+  const staleIso = new Date(Date.now() - staleDays * 86400000).toISOString();
+
   const { data: rows, error } = await supabase
     .from("instagram_accounts")
     .select("*")
     .not("website", "is", null)
-    .or("enriched_at.is.null,enriched_at.lt." + new Date(Date.now() - staleDays * 86400000).toISOString())
+    .or(`enriched_at.is.null,enriched_at.lt.${staleIso}`)
     .limit(batchSize);
 
   if (error) {
@@ -45,14 +63,14 @@ async function runEnrich(req: NextRequest) {
         followers: lead.followers ?? 0,
         has_website: true,
         has_booking: info?.has_booking ?? false,
-        has_checkout: info?.has_checkout ?? false,
+        has_checkout: info?.has_has_checkout ?? info?.has_checkout ?? false,
         offer_keywords: info?.offer_keywords ?? [],
         has_email: !!info?.contact_email,
         has_phone: !!info?.contact_phone,
         has_whatsapp: !!info?.contact_whatsapp,
       });
 
-      await supabase
+      const { error: upErr } = await supabase
         .from("instagram_accounts")
         .update({
           website_title: info?.website_title ?? lead.website_title ?? null,
@@ -70,14 +88,24 @@ async function runEnrich(req: NextRequest) {
         })
         .eq("id", lead.id);
 
+      if (upErr) {
+        failures++;
+        await safeLogJobRun(supabase, {
+          job: "enrich-websites",
+          ok: false,
+          meta: { lead_id: lead.id, reason: upErr.message },
+        });
+        continue;
+      }
+
       enriched++;
     } catch (e: any) {
       failures++;
-      await supabase.from("job_runs").insert({
+      await safeLogJobRun(supabase, {
         job: "enrich-websites",
         ok: false,
         meta: { lead_id: lead.id, reason: e?.message || "ENRICH_FAILED" },
-      }).catch(() => {});
+      });
     }
   }
 
@@ -92,7 +120,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ✅ Cron GET support
+// ✅ Vercel cron calls endpoints with GET, so support GET too
 export async function GET(req: NextRequest) {
   try {
     return await runEnrich(req);
