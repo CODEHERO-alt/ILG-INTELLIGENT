@@ -201,15 +201,7 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number) {
-  const ac = new AbortController();
-  const id = setTimeout(() => ac.abort(), ms);
-  return {
-    signal: ac.signal,
-    wrapped: promise.finally(() => clearTimeout(id)),
-  };
-}
-
+// ✅ Fixed: no self-referential `signal` destructuring
 async function fetchJsonWithRetry(url: string, init: RequestInit, label: string) {
   const maxAttempts = Number(process.env.SEARCH_RETRY_MAX ?? "4");
   const baseDelayMs = Number(process.env.SEARCH_RETRY_BASE_MS ?? "450");
@@ -219,11 +211,14 @@ async function fetchJsonWithRetry(url: string, init: RequestInit, label: string)
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const { signal, wrapped } = withTimeout(
-        fetch(url, { ...init, signal, cache: "no-store" }),
-        timeoutMs
-      );
-      const res = await wrapped;
+      const ac = new AbortController();
+      const id = setTimeout(() => ac.abort(), timeoutMs);
+
+      const res = await fetch(url, {
+        ...init,
+        cache: "no-store",
+        signal: ac.signal,
+      }).finally(() => clearTimeout(id));
 
       if (res.ok) return await res.json();
 
@@ -239,7 +234,12 @@ async function fetchJsonWithRetry(url: string, init: RequestInit, label: string)
     } catch (e: any) {
       lastErr = e;
       const msg = String(e?.message || "");
-      const retryable = msg.includes("aborted") || msg.includes("429") || msg.includes("5");
+      const retryable =
+        msg.includes("aborted") ||
+        msg.includes("AbortError") ||
+        msg.includes("429") ||
+        msg.includes("5");
+
       if (!retryable || attempt === maxAttempts) break;
 
       const jitter = Math.floor(Math.random() * 150);
