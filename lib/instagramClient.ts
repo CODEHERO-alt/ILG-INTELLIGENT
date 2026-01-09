@@ -66,7 +66,9 @@ function buildQueries(params: DiscoverParams) {
     (parts) => `site:instagram.com ${parts.join(" ")}`,
     // Bias toward contact / booking intent.
     (parts) =>
-      `site:instagram.com ${parts.map((p) => `"${p}"`).join(" ")} ("book" OR "dm" OR "whatsapp" OR "contact")`,
+      `site:instagram.com ${parts
+        .map((p) => `"${p}"`)
+        .join(" ")} ("book" OR "dm" OR "whatsapp" OR "contact")`,
   ];
 
   const queries: string[] = [];
@@ -131,9 +133,12 @@ function extractInstagramUsername(url: string): string | null {
     if (!host.endsWith("instagram.com")) return null;
 
     const parts = u.pathname.split("/").filter(Boolean);
-    if (!parts.length) return null;
 
-    const first = parts[0].toLowerCase();
+    // ✅ TS-safe: don't assume parts[0] exists
+    const firstRaw = parts[0];
+    if (!firstRaw) return null;
+
+    const first = firstRaw.toLowerCase();
     if (!isLikelyProfileSegment(first)) return null;
 
     return sanitizeUsername(first);
@@ -214,7 +219,10 @@ async function fetchJsonWithRetry(url: string, init: RequestInit, label: string)
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const { signal, wrapped } = withTimeout(fetch(url, { ...init, signal, cache: "no-store" }), timeoutMs);
+      const { signal, wrapped } = withTimeout(
+        fetch(url, { ...init, signal, cache: "no-store" }),
+        timeoutMs
+      );
       const res = await wrapped;
 
       if (res.ok) return await res.json();
@@ -286,7 +294,9 @@ async function fetchSerpApiResults(query: string, num: number): Promise<SerpResu
   url.searchParams.set("gl", process.env.SEARCH_GL ?? "us");
 
   const json = await fetchJsonWithRetry(url.toString(), { method: "GET" }, "SERPAPI_ERROR");
-  const organic = Array.isArray((json as any)?.organic_results) ? ((json as any).organic_results as any[]) : [];
+  const organic = Array.isArray((json as any)?.organic_results)
+    ? ((json as any).organic_results as any[])
+    : [];
 
   return organic.map((r) => ({
     title: r?.title,
@@ -369,10 +379,7 @@ export async function discoverInstagramAccounts(rawParams?: Partial<DiscoverPara
           if (!u) continue;
 
           // Try to infer a website/bio-link from snippet/title as a hint.
-          const website =
-            extractWebsiteFromText(r.snippet) ??
-            extractWebsiteFromText(r.title) ??
-            null;
+          const website = extractWebsiteFromText(r.snippet) ?? extractWebsiteFromText(r.title) ?? null;
 
           candidates.push({
             username: u,
