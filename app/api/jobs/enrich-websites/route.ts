@@ -14,12 +14,9 @@ async function safeLogJobRun(
   payload: any
 ) {
   try {
-    const { error } = await supabase.from("job_runs").insert(payload);
-    if (error) {
-      // ignore
-    }
+    await supabase.from("job_runs").insert(payload);
   } catch {
-    // ignore
+    // ignore logging failures
   }
 }
 
@@ -28,19 +25,22 @@ async function runEnrich(req: NextRequest) {
 
   const supabase = getAdminSupabaseClient();
 
-  const batchSize = clampInt(process.env.ENRICH_BATCH_SIZE, 50, 1, 200);
-  const staleDays = clampInt(process.env.ENRICH_STALE_DAYS, 7, 1, 365);
-
-  const staleIso = new Date(Date.now() - staleDays * 86400000).toISOString();
+  const url = new URL(req.url);
+  const limit = clampInt(url.searchParams.get("limit"), 50, 1, 200);
 
   const { data: rows, error } = await supabase
     .from("instagram_accounts")
     .select("*")
-    .not("website", "is", null)
-    .or(`enriched_at.is.null,enriched_at.lt.${staleIso}`)
-    .limit(batchSize);
+    .is("enriched_at", null)
+    .order("created_at", { ascending: true })
+    .limit(limit);
 
   if (error) {
+    await safeLogJobRun(supabase, {
+      job: "enrich-websites",
+      ok: false,
+      meta: { reason: error.message },
+    });
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
@@ -104,8 +104,15 @@ async function runEnrich(req: NextRequest) {
         ok: false,
         meta: { lead_id: lead.id, reason: e?.message || "ENRICH_FAILED" },
       });
+      continue;
     }
   }
+
+  await safeLogJobRun(supabase, {
+    job: "enrich-websites",
+    ok: true,
+    meta: { processed, enriched, failures, limit },
+  });
 
   return NextResponse.json({ ok: true, processed, enriched, failures });
 }
