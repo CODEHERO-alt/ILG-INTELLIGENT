@@ -39,23 +39,30 @@ function SetupNotice({ message }: { message: string }) {
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur">
-          <h1 className="text-xl font-semibold tracking-tight">Dashboard setup required</h1>
+          <h1 className="text-xl font-semibold tracking-tight">
+            Dashboard setup required
+          </h1>
           <p className="mt-2 text-sm text-slate-300">
             Your app is deployed, but the Supabase database schema is not initialized yet.
           </p>
 
           <div className="mt-5 rounded-xl border border-white/10 bg-black/30 p-4">
             <div className="text-xs font-semibold text-slate-200">Error</div>
-            <div className="mt-2 text-xs text-slate-300 whitespace-pre-wrap break-words">
+            <div className="mt-2 whitespace-pre-wrap break-words text-xs text-slate-300">
               {message}
             </div>
           </div>
 
           <div className="mt-5 text-sm text-slate-200">
             <div className="font-semibold">Fix</div>
-            <ol className="mt-2 list-decimal pl-5 space-y-1 text-slate-300">
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-slate-300">
               <li>Open Supabase → SQL Editor</li>
-              <li>Run the migration in <code className="text-slate-100">supabase/migrations/01_init_instagram_lead_engine.sql</code></li>
+              <li>
+                Run the migration in{" "}
+                <code className="text-slate-100">
+                  supabase/migrations/01_init_instagram_lead_engine.sql
+                </code>
+              </li>
               <li>Refresh this page</li>
             </ol>
           </div>
@@ -87,8 +94,8 @@ export default async function DashboardPage() {
     await requireAdminUser();
   } catch (e: any) {
     if (e?.message === "UNAUTHENTICATED") redirect("/login?next=%2Fdashboard");
-    if (e?.message === "FORBIDDEN") redirect("/login?next=%2Fdashboard&error=forbidden");
-
+    if (e?.message === "FORBIDDEN")
+      redirect("/login?next=%2Fdashboard&error=forbidden");
     throw e;
   }
 
@@ -122,6 +129,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="relative mx-auto max-w-6xl px-6 py-10">
+        {/* HEADER */}
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200">
@@ -141,7 +149,9 @@ export default async function DashboardPage() {
               Admin
             </div>
           </div>
+        </div>
 
+        {/* CONTENT */}
         <DiscoveryPanel />
         <LeadTable leads={data ?? []} />
       </div>
