@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAdminSupabaseClient, requireAdminUser } from "@/lib/auth";
 import LeadTable from "@/components/lead-table";
+import ExportLeadsButton from "@/components/export-leads-button";
 import DiscoveryPanel from "@/components/discovery-panel";
 
 export const dynamic = "force-dynamic";
@@ -133,11 +134,13 @@ export default async function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <span className="h-2 w-2 rounded-full bg-slate-500" />
-            Admin
+          <div className="flex items-center gap-2">
+            <ExportLeadsButton />
+            <div className="flex items-center gap-2 text-xs text-slate-300">
+              <span className="h-2 w-2 rounded-full bg-slate-500" />
+              Admin
+            </div>
           </div>
-        </div>
 
         <DiscoveryPanel />
         <LeadTable leads={data ?? []} />
